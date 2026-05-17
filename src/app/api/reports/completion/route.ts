@@ -16,7 +16,7 @@ const sheets = await prisma.goalSheet.findMany({
   where: {
     employee: { role: Role.EMPLOYEE },
     ...(session.user.role === Role.MANAGER ? { managerId: session.user.id } : {}),
-    cycle: { year: 2026 }
+    //cycle: { year: 2026 }
   },
   include: {
     employee: { select: { id: true, name: true, email: true } },
