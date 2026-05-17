@@ -22,19 +22,30 @@ type Sheet = {
 const uoms = ["NUMERIC", "PERCENT", "TIMELINE", "ZERO_BASED"] as const;
 const directions = ["MIN_HIGHER_BETTER", "MAX_LOWER_BETTER"] as const;
 
-export default function EmployeeGoalsPage() {
+
+  export default function EmployeeGoalsPage() {
   const [sheet, setSheet] = useState<Sheet | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [isInitializing, setIsInitializing] = useState(true);
 
   async function load() {
     setError(null);
     const res = await fetch("/api/sheets/me");
-    if (!res.ok) {
+    if (res.status === 404) {
+      // Handle the case where no cycle/sheet exists yet
+      setSheet({
+        id: "adhoc",
+        status: "DRAFT",
+        lockedAt: null,
+        goals: []
+      });
+    } else if (!res.ok) {
       setError(await res.text());
       return;
     }
-    setSheet(await res.json());
+    else{setSheet(await res.json());}
+    setIsInitializing(false);
   }
 
   useEffect(() => {
