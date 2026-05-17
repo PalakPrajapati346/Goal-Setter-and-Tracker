@@ -33,6 +33,17 @@ export async function GET() {
 export async function POST() {
   try {
     const session = await requireUserSession();
+  
+  // DEBUG: This will show up in your Vercel logs
+  console.log("Current Session:", JSON.stringify(session));
+
+  if (!session?.user?.id) {
+    return NextResponse.json({ 
+      error: "Session missing user ID", 
+      debug: !!session 
+    }, { status: 401 });
+  }
+    
 
     // 1. Check if a sheet already exists to prevent duplicates
     const existing = await prisma.goalSheet.findFirst({
