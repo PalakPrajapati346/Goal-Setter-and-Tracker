@@ -7,7 +7,7 @@ export async function POST(req: Request, ctx: { params: { id: string } }) {
     const session = await requireUserSession();
     const { goals } = await req.json();
 
-    const CYCLE_ID = "adhoc-2026"; // or derive from ctx.params.id or request body
+    const CYCLE_ID = "Cycle1"; // or derive from ctx.params.id or request body
 
     const result = await prisma.$transaction(async (tx) => {
 
