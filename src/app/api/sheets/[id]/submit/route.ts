@@ -7,7 +7,14 @@ export async function POST(req: Request, ctx: { params: { id: string } }) {
     const session = await requireUserSession();
     const { goals } = await req.json();
 
-    const CYCLE_ID = "Cycle1"; // or derive from ctx.params.id or request body
+    // Replace hardcoded CYCLE_ID with this
+const cycle = await tx.cycle.findFirst({
+  where: { name: "Cycle1" },
+  select: { id: true },
+});
+
+if (!cycle) throw new Error("Cycle 'Cycle1' not found.");
+const CYCLE_ID = cycle.id;
 
     const result = await prisma.$transaction(async (tx) => {
 
