@@ -13,21 +13,49 @@ export async function POST(req: Request, ctx: { params: { id: string } }) {
       // 1. FAST BULK UPDATE
       // Instead of a loop that waits for each update, we trigger all updates 
       // simultaneously using Promise.all. This is much faster in TiDB.
-      await Promise.all(
-        goals.map((g: any) =>
-          tx.goal.update({
-            where: { id: g.id },
-            data: { 
-              weightPct: g.weightPct,
-              title: g.title,
-              thrustArea: g.thrustArea,
-              uomType: g.uomType,
-              direction: g.direction,
-              target: g.target
-            },
-          })
-        )
-      );
+      // Inside your transaction in src/app/api/sheets/[id]/submit/route.ts
+    // 1. Delete goals that are NOT in the list sent by the frontend
+const finalIds = goals.filter((g: any) => !String(g.id).startsWith("temp-")).map((g: any) => g.id);
+
+await tx.goal.deleteMany({
+  where: {
+    sheetId: sheetId,
+    id: { notIn: finalIds }
+  }
+});
+
+// 2. Then run the Promise.all(upserts...) code above
+await Promise.all(
+  goals.map((g: any) => {
+    // Check if it's a real database ID (usually a CUID/UUID) or a temp one
+    const isTempId = String(g.id).startsWith("temp-");
+
+    return tx.goal.upsert({
+      where: { 
+        // If it's a temp ID, we provide an ID that definitely won't exist 
+        // to force the 'create' block to run
+        id: isTempId ? "new-goal-placeholder" : g.id 
+      },
+      update: {
+        title: g.title,
+        thrustArea: g.thrustArea,
+        uomType: g.uomType,
+        direction: g.direction,
+        target: g.target,
+        weightPct: g.weightPct,
+      },
+      create: {
+        sheetId: sheetId, // Use the ID from params
+        title: g.title,
+        thrustArea: g.thrustArea,
+        uomType: g.uomType,
+        direction: g.direction,
+        target: g.target,
+        weightPct: g.weightPct,
+      },
+    });
+  })
+);
 
       // 2. STATUS UPDATE
       const updatedSheet = await tx.goalSheet.update({
