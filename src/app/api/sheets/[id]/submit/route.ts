@@ -1,43 +1,68 @@
 import { NextResponse } from "next/server";
-import { GoalSheetStatus, Role } from "@prisma/client";
+import { GoalSheetStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireUserSession } from "@/lib/session";
-import { validateGoalWeights } from "@/lib/goal-rules";
-import { assertCycleWindow, demoRelaxWindows } from "@/lib/cycles";
 
 export async function POST(req: Request, ctx: { params: { id: string } }) {
-  const session = await requireUserSession();
-  const body = await req.json(); // Contains the goals from the frontend
-  const { goals } = body;
+  try {
+    const session = await requireUserSession();
+    const { id: sheetId } = ctx.params;
+    const { goals } = await req.json();
 
-  const result = await prisma.$transaction(async (tx) => {
-    // 1. Bulk update each goal's weight
-    for (const g of goals) {
-      await tx.goal.update({
-        where: { id: g.id },
-        data: { weightPct: g.weightPct }
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. FAST BULK UPDATE
+      // Instead of a loop that waits for each update, we trigger all updates 
+      // simultaneously using Promise.all. This is much faster in TiDB.
+      await Promise.all(
+        goals.map((g: any) =>
+          tx.goal.update({
+            where: { id: g.id },
+            data: { 
+              weightPct: g.weightPct,
+              title: g.title,
+              thrustArea: g.thrustArea,
+              uomType: g.uomType,
+              direction: g.direction,
+              target: g.target
+            },
+          })
+        )
+      );
+
+      // 2. STATUS UPDATE
+      const updatedSheet = await tx.goalSheet.update({
+        where: { id: sheetId },
+        data: { 
+          status: "SUBMITTED", 
+          submittedAt: new Date() 
+        }
       });
-    }
 
-    // 2. Change status to SUBMITTED
-    const updatedSheet = await tx.goalSheet.update({
-      where: { id: ctx.params.id },
-      data: { status: "SUBMITTED", submittedAt: new Date() }
+      // 3. AUDIT LOG (As requested)
+      await tx.auditLog.create({
+        data: {
+          entity: "GOAL_SHEET",
+          entityId: sheetId,
+          action: "SUBMIT",
+          actorId: session.user.id,
+          // We can add more helpful JSON details here
+          detail: JSON.stringify({
+            message: `Employee submitted sheet with ${goals.length} goals.`,
+            totalWeight: goals.reduce((sum: number, g: any) => sum + (g.weightPct || 0), 0),
+            timestamp: new Date().toISOString()
+          })
+        }
+      });
+
+      return updatedSheet;
     });
 
-    // 3. Create Audit Log
-    await tx.auditLog.create({
-      data: {
-        entity: "GOAL_SHEET",
-        entityId: ctx.params.id,
-        action: "SUBMIT",
-        actorId: session.user.id,
-        detail: `Employee submitted sheet with ${goals.length} goals.`
-      }
-    });
-
-    return updatedSheet;
-  });
-
-  return NextResponse.json(result);
+    return NextResponse.json(result);
+  } catch (error: any) {
+    console.error("SUBMIT_ERROR:", error);
+    return NextResponse.json(
+      { error: error.message || "Failed to submit goals" }, 
+      { status: 500 }
+    );
+  }
 }
