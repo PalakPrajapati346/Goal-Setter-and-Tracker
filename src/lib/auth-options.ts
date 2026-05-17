@@ -1,5 +1,6 @@
 import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
+import GithubProvider from "next-auth/providers/github";
 import bcrypt from "bcryptjs";
 import { Role } from "@prisma/client";
 import { prisma } from "./prisma";
@@ -8,8 +9,30 @@ export const authOptions: NextAuthOptions = {
   session: { strategy: "jwt" },
   pages: { signIn: "/login" },
   providers: [
+    // 1. GITHUB LOGIN
+    GithubProvider({
+      clientId: process.env.GITHUB_ID!,
+      clientSecret: process.env.GITHUB_SECRET!,
+      async profile(profile) {
+        // This checks if the user already exists in your TiDB
+        const existingUser = await prisma.user.findUnique({
+          where: { email: profile.email as string },
+        });
+
+        return {
+          id: profile.id.toString(),
+          name: profile.name ?? profile.login,
+          email: profile.email,
+          image: profile.avatar_url,
+          // If they exist in DB, use their role, otherwise default to EMPLOYEE
+          role: existingUser?.role ?? "EMPLOYEE", 
+        };
+      },
+    }),
+
+    // 2. EXISTING CREDENTIALS LOGIN
     CredentialsProvider({
-      name: "Credentials", // Changed from Demo login
+      name: "Credentials",
       credentials: {
         email: { label: "Email", type: "text" },
         password: { label: "Password", type: "password" },
@@ -17,18 +40,15 @@ export const authOptions: NextAuthOptions = {
       async authorize(creds) {
         if (!creds?.email || !creds.password) return null;
 
-        // This cross-verifies against the DB
         const user = await prisma.user.findUnique({ 
           where: { email: creds.email } 
         });
 
-        // If user doesn't exist or password doesn't match, login fails
-        if (!user) return null;
+        if (!user || !user.passwordHash) return null;
         
         const ok = await bcrypt.compare(creds.password, user.passwordHash);
         if (!ok) return null;
 
-        // This object is what gets stored in the JWT token
         return { 
           id: user.id, 
           email: user.email, 
@@ -42,14 +62,14 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
-        token.role = (user as any).role; // Pass the Persona (Role) to the token
+        token.role = (user as any).role;
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string;
-        session.user.role = token.role as Role; // Attach Persona to the active session
+        session.user.role = token.role as Role;
       }
       return session;
     },
