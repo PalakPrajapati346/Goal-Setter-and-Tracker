@@ -61,8 +61,10 @@ export default async function AdminHome() {
             <p className="font-semibold text-slate-900">
               {session.user.name}
             </p>
-             <button
-                          type="button"
+            <Link className="text-sm text-slate-500 hover:text-slate-800" href="/dashboard">
+              Dashboard
+            </Link>
+             <button type="button"
                           className="text-sm font-medium text-brand"
                           onClick={() => signOut({ callbackUrl: "/login" })}
                         >
