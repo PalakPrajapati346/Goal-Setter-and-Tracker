@@ -211,13 +211,12 @@ async function patchGoal(id: string, patch: Record<string, unknown>) {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-  {/* 1. Safe Check: If goals is null, undefined, or empty, show the empty state */}
-  {(!sheet?.goals || sheet.goals.length === 0) ? (
-    <tr>
-      <td colSpan={7} className="px-4 py-12 text-center text-slate-500 italic">
-        No goals added yet. Click "+ Add Goal" to begin your plan.
-      </td>
-    </tr>
+            {sheet.goals.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="px-4 py-12 text-center text-slate-500">
+                  No goals added. Click + Add Goal to start.
+                </td>
+              </tr>
             ) : (
               sheet.goals.map((g) => (
                 <tr key={g.id} className="hover:bg-slate-50/50">
