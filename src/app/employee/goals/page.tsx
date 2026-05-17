@@ -96,9 +96,11 @@ async function addGoal() {
     });
 
     if (!res.ok) {
-      const errText = await res.text();
-      throw new Error(`Server rejected goal: ${errText}`);
-    }
+  const errText = await res.text();
+  setMsg(null); // Clear the "Adding..." message
+  setError(`Server rejected goal: ${errText}`);
+  return;
+}
 
     await load();
     setMsg("Goal added successfully!");

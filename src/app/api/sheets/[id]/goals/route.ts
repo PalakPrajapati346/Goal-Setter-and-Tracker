@@ -5,6 +5,7 @@ import { requireUserSession } from "@/lib/session";
 // ... existing imports
 
 export async function POST(req: Request, ctx: { params: { id: string } }) {
+    try{
   const session = await requireUserSession();
   const sheetId = ctx.params.id;
 
@@ -42,5 +43,9 @@ export async function POST(req: Request, ctx: { params: { id: string } }) {
     },
   });
 
-  return NextResponse.json(newGoal);
+  return NextResponse.json(newGoal);}
+catch (err: any) {
+    console.error("GOAL_CREATE_ERROR:", err);
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
 }
