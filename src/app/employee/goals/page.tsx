@@ -62,41 +62,51 @@ const directions = ["MIN_HIGHER_BETTER", "MAX_LOWER_BETTER"] as const;
   }, [sheet]);
 
   const editable = sheet && (sheet.status === "DRAFT" || sheet.status === "REWORK");
+async function addGoal() {
+  setError(null);
+  setMsg(null);
+  
+  let idToUse = sheet?.id;
 
-  async function addGoal() {
-    setMsg(null);
-  let currentSheetId = sheet?.id;
-
-  // STEP 1: If no sheet exists in DB, create it first
-  if (currentSheetId === "PENDING") {
-    setMsg("Initializing your goal sheet...");
-    const createRes = await fetch("/api/sheets", { method: "POST" });
-    if (!createRes.ok) {
-      setError("Could not initialize sheet: " + await createRes.text());
-      return;
+  try {
+    // 1. Handle Initialization
+    if (idToUse === "PENDING") {
+      setMsg("Creating your goal sheet in database...");
+      const createRes = await fetch("/api/sheets", { method: "POST" });
+      if (!createRes.ok) throw new Error(await createRes.text());
+      
+      const newSheet = await createRes.json();
+      idToUse = newSheet.id;
+      setSheet(newSheet); // Update local state
     }
-    const newSheet = await createRes.json();
-    currentSheetId = newSheet.id;
-  }
-  const res = await fetch(`/api/sheets/${currentSheetId}/goals`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      title: "New Goal",
-      thrustArea: "General",
-      uomType: "NUMERIC",
-      direction: "MIN_HIGHER_BETTER",
-      target: "0",
-      weightPct: 10,
-    }),
-  });
+
+    // 2. Add the Goal
+    setMsg("Adding goal...");
+    const res = await fetch(`/api/sheets/${idToUse}/goals`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: "New Goal",
+        thrustArea: "General",
+        uomType: "NUMERIC",
+        direction: "MIN_HIGHER_BETTER",
+        target: "0",
+        weightPct: 10,
+      }),
+    });
+
     if (!res.ok) {
-      setError("Failed to create goal: " + (await res.text()));
-      return;
+      const errText = await res.text();
+      throw new Error(`Server rejected goal: ${errText}`);
     }
+
     await load();
-    setMsg("Goal added!");
+    setMsg("Goal added successfully!");
+  } catch (err) {
+    setError(err instanceof Error ? err.message : "An unknown error occurred");
+    console.error("Add Goal Error:", err);
   }
+}
 
 async function patchGoal(id: string, patch: Record<string, unknown>) {
   // 1. Don't clear error immediately to avoid UI jumps
