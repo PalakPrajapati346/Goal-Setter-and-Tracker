@@ -90,31 +90,15 @@ async function addGoal() {
   setMsg("Goal added to list (Not yet saved to database)");
 }
 
-async function patchGoal(id: string, patch: Record<string, unknown>) {
-  // 1. Don't clear error immediately to avoid UI jumps
-  setMsg("Saving..."); 
-
-  const res = await fetch(`/api/goals/${id}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(patch),
+function updateLocalGoal(id: string, updates: Partial<Sheet["goals"][0]>) {
+  setSheet((prev) => {
+    if (!prev) return prev;
+    return {
+      ...prev,
+      goals: prev.goals.map((g) => (g.id === id ? { ...g, ...updates } : g)),
+    };
   });
-
-  const data = await res.json().catch(() => ({}));
-
-  if (!res.ok) {
-    const errorMsg = data.errors?.[0] || data.error || "Save failed";
-    setError(errorMsg);
-    // ONLY reload on error to revert the UI to the last "truth" in the DB
-    await load(); 
-    return;
-  }
-
-  // 2. On success, we don't necessarily NEED to load() if our local state 
-  // is already correct, but for a hackathon, it's safer to just set the msg.
-  setMsg("Saved");
 }
-
  async function submit() {
   if (!sheet) return;
   if (totalWeight !== 100) {
@@ -122,27 +106,23 @@ async function patchGoal(id: string, patch: Record<string, unknown>) {
     return;
   }
 
-  setMsg("Saving all goals and submitting for approval...");
+  setMsg("Saving all goals and submitting...");
 
-  try {
-    const res = await fetch(`/api/sheets/submit-all`, { 
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ 
-        goals: sheet.goals // Send the whole local list
-      }) 
-    });
+  const res = await fetch(`/api/sheets/${sheet.id}/submit`, { 
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    // This sends the current local list of goals to the backend
+    body: JSON.stringify({ goals: sheet.goals }) 
+  });
 
-    if (!res.ok) {
-      const data = await res.json();
-      throw new Error(data.error || "Submission failed");
-    }
-
-    setMsg("Everything saved and submitted successfully!");
-    await load(); // Finally refresh from DB
-  } catch (err: any) {
-    setError(err.message);
+  if (!res.ok) {
+    const data = await res.json();
+    setError(data.error || "Submission failed");
+    return;
   }
+
+  setMsg("All goals saved and submitted successfully!");
+  await load(); // Refresh once to get the final "SUBMITTED" status from DB
 }
   if (!sheet) {
     return <p className="p-8 text-sm text-slate-600">{error ?? "Loading…"}</p>;
@@ -222,13 +202,11 @@ async function patchGoal(id: string, patch: Record<string, unknown>) {
                 <tr key={g.id} className="hover:bg-slate-50/50">
                   <td className="px-3 py-2">
                     <input
-                      className="w-full rounded border border-slate-200 px-2 py-1 disabled:bg-slate-50"
-                      defaultValue={g.title}
-                      disabled={!editable || g.readOnlyTitleTarget}
-                      onBlur={(ev) => {
-                        if (ev.target.value !== g.title) void patchGoal(g.id, { title: ev.target.value });
-                      }}
-                    />
+  className="w-full rounded border border-slate-200 px-2 py-1"
+  value={g.title}
+  // Change this from onBlur={patchGoal} to onChange={updateLocalGoal}
+  onChange={(ev) => updateLocalGoal(g.id, { title: ev.target.value })}
+/>
                   </td>
                   <td className="px-3 py-2">
                     <input
