@@ -64,25 +64,38 @@ const directions = ["MIN_HIGHER_BETTER", "MAX_LOWER_BETTER"] as const;
   const editable = sheet && (sheet.status === "DRAFT" || sheet.status === "REWORK");
 
   async function addGoal() {
-    if (!sheet) return;
     setMsg(null);
-    const res = await fetch(`/api/sheets/${sheet.id}/goals`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: "New Goal",
-        thrustArea: "General",
-        uomType: "NUMERIC",
-        direction: "MIN_HIGHER_BETTER",
-        target: "0",
-        weightPct: 10,
-      }),
-    });
+  let currentSheetId = sheet?.id;
+
+  // STEP 1: If no sheet exists in DB, create it first
+  if (currentSheetId === "PENDING") {
+    setMsg("Initializing your goal sheet...");
+    const createRes = await fetch("/api/sheets", { method: "POST" });
+    if (!createRes.ok) {
+      setError("Could not initialize sheet: " + await createRes.text());
+      return;
+    }
+    const newSheet = await createRes.json();
+    currentSheetId = newSheet.id;
+  }
+  const res = await fetch(`/api/sheets/${currentSheetId}/goals`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      title: "New Goal",
+      thrustArea: "General",
+      uomType: "NUMERIC",
+      direction: "MIN_HIGHER_BETTER",
+      target: "0",
+      weightPct: 10,
+    }),
+  });
     if (!res.ok) {
       setError("Failed to create goal: " + (await res.text()));
       return;
     }
     await load();
+    setMsg("Goal added!");
   }
 
 async function patchGoal(id: string, patch: Record<string, unknown>) {
