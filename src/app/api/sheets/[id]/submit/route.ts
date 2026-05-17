@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUserSession } from "@/lib/session";
-
+import { Prisma } from "@prisma/client";
 export async function POST(req: Request, ctx: { params: { id: string } }) {
   try {
     const session = await requireUserSession();
@@ -10,7 +10,7 @@ export async function POST(req: Request, ctx: { params: { id: string } }) {
     // Replace hardcoded CYCLE_ID with this
 
 
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx :Prisma.TransactionClient) => {
       const cycle = await tx.cycle.findFirst({
   where: { name: "Cycle1" },
   select: { id: true },
