@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { Role } from "@prisma/client";
 import { authOptions } from "@/lib/auth-options";
-
+import { signOut } from "next-auth/react";
 export default async function AdminHome() {
   const session = await getServerSession(authOptions);
 
@@ -61,6 +61,13 @@ export default async function AdminHome() {
             <p className="font-semibold text-slate-900">
               {session.user.name}
             </p>
+             <button
+                          type="button"
+                          className="text-sm font-medium text-brand"
+                          onClick={() => signOut({ callbackUrl: "/login" })}
+                        >
+                          Sign out
+                        </button>
           </div>
         </div>
 
