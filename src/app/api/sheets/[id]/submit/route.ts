@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { GoalSheetStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireUserSession } from "@/lib/session";
 
@@ -8,22 +7,29 @@ export async function POST(req: Request, ctx: { params: { id: string } }) {
     const session = await requireUserSession();
     const { goals } = await req.json();
 
+    const CYCLE_ID = "adhoc-2026"; // or derive from ctx.params.id or request body
+
     const result = await prisma.$transaction(async (tx) => {
-      
-      // 1. ENSURE SHEET EXISTS (Parent)
-      // This handles the "PENDING" case by creating the sheet if it doesn't exist
+
+      // 1. ENSURE SHEET EXISTS
+      // @@unique([employeeId, cycleId]) is the correct upsert key
       const sheet = await tx.goalSheet.upsert({
-        where: { userId: session.user.id },
-        update: { 
-          status: "SUBMITTED", 
-          submittedAt: new Date() 
+        where: {
+          employeeId_cycleId: {
+            employeeId: session.user.id,
+            cycleId: CYCLE_ID,
+          },
+        },
+        update: {
+          status: "SUBMITTED",
+          submittedAt: new Date(),
         },
         create: {
-          userId: session.user.id,
+          employeeId: session.user.id,
+          cycleId: CYCLE_ID,
           status: "SUBMITTED",
-          cycleId: "adhoc-2026", // Default cycle
-          submittedAt: new Date()
-        }
+          submittedAt: new Date(),
+        },
       });
 
       const realSheetId = sheet.id;
@@ -36,28 +42,34 @@ export async function POST(req: Request, ctx: { params: { id: string } }) {
       await tx.goal.deleteMany({
         where: {
           sheetId: realSheetId,
-          id: { notIn: finalIds }
-        }
+          id: { notIn: finalIds },
+        },
       });
 
-      // 3. UPSERT GOALS (Children)
+      // 3. UPSERT GOALS
       await Promise.all(
         goals.map((g: any) => {
           const isTempId = String(g.id).startsWith("temp-");
-          return tx.goal.upsert({
-            where: { 
-              id: isTempId ? "new-goal-placeholder" : g.id 
-            },
-            update: {
-              title: g.title,
-              thrustArea: g.thrustArea,
-              uomType: g.uomType,
-              direction: g.direction,
-              target: g.target,
-              weightPct: g.weightPct,
-            },
-            create: {
-              sheetId: realSheetId, // Use the real ID from the upserted sheet
+
+          if (isTempId) {
+            // temp IDs → always create
+            return tx.goal.create({
+              data: {
+                sheetId: realSheetId,
+                title: g.title,
+                thrustArea: g.thrustArea,
+                uomType: g.uomType,
+                direction: g.direction,
+                target: g.target,
+                weightPct: g.weightPct,
+              },
+            });
+          }
+
+          // real IDs → update
+          return tx.goal.update({
+            where: { id: g.id },
+            data: {
               title: g.title,
               thrustArea: g.thrustArea,
               uomType: g.uomType,
@@ -78,10 +90,13 @@ export async function POST(req: Request, ctx: { params: { id: string } }) {
           actorId: session.user.id,
           detail: JSON.stringify({
             message: `Employee submitted sheet with ${goals.length} goals.`,
-            totalWeight: goals.reduce((sum: number, g: any) => sum + (g.weightPct || 0), 0),
-            timestamp: new Date().toISOString()
-          })
-        }
+            totalWeight: goals.reduce(
+              (sum: number, g: any) => sum + (g.weightPct || 0),
+              0
+            ),
+            timestamp: new Date().toISOString(),
+          }),
+        },
       });
 
       return sheet;
@@ -91,7 +106,7 @@ export async function POST(req: Request, ctx: { params: { id: string } }) {
   } catch (error: any) {
     console.error("SUBMIT_ERROR:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to submit goals" }, 
+      { error: error.message || "Failed to submit goals" },
       { status: 500 }
     );
   }
