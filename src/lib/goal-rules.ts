@@ -3,22 +3,41 @@ const MAX_GOALS = 8;
 
 // src/lib/goal-rules.ts
 
-export function validateGoalWeights(goals: { weightPct: any }[]) {
-  const errors: string[] = [];
-  let sum = 0;
-
-  for (const g of goals) {
-    const w = parseFloat(String(g.weightPct)) || 0;
-    if (w < 10) errors.push("Each goal must be at least 10% weightage.");
-    sum += w;
+export function parseDecimalWeight(input: string | number | null | undefined): number | null {
+  if (input === null || input === undefined || input === "") {
+    return null;
   }
 
-  // CHANGE THIS LINE: 
-  // Only error if it EXCEEDS 100. 
-  // We check for "Exactly 100" in the SUBMIT route, not the PATCH route.
-  if (sum > 100.01) {
-    errors.push(`Total weightage cannot exceed 100%. Currently: ${sum}%`);
+  // Convert to number if it's a string
+  const parsed = typeof input === "string" ? parseFloat(input) : input;
+
+  // Check if it's a valid finite number
+  if (isNaN(parsed) || !isFinite(parsed)) {
+    return null;
   }
 
-  return { ok: errors.length === 0, errors };
+  // Optional: You can round to 2 decimal places to match database precision
+  return Math.round(parsed * 100) / 100;
+}
+
+/**
+ * Validates that the total weight of all goals in a sheet is exactly 100%.
+ */
+export function validateGoalWeights(goals: { weightPct: number | any }[]) {
+  const totalWeight = goals.reduce((sum, g) => {
+    // Ensure we handle Decimal objects from Prisma by wrapping in Number()
+    return sum + Number(g.weightPct || 0);
+  }, 0);
+
+  // Using a small epsilon for floating point comparison (e.g., 99.99999999)
+  const isValid = Math.abs(totalWeight - 100) < 0.01;
+
+  if (!isValid) {
+    return {
+      ok: false,
+      errors: [`Total weight must be exactly 100%. Current total: ${totalWeight}%`],
+    };
+  }
+
+  return { ok: true };
 }
