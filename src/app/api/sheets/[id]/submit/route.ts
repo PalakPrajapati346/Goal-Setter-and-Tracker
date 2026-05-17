@@ -8,16 +8,16 @@ export async function POST(req: Request, ctx: { params: { id: string } }) {
     const { goals } = await req.json();
 
     // Replace hardcoded CYCLE_ID with this
-const cycle = await tx.cycle.findFirst({
+
+
+    const result = await prisma.$transaction(async (tx) => {
+      const cycle = await tx.cycle.findFirst({
   where: { name: "Cycle1" },
   select: { id: true },
 });
 
 if (!cycle) throw new Error("Cycle 'Cycle1' not found.");
 const CYCLE_ID = cycle.id;
-
-    const result = await prisma.$transaction(async (tx) => {
-
       // 1. ENSURE SHEET EXISTS
       // @@unique([employeeId, cycleId]) is the correct upsert key
       const sheet = await tx.goalSheet.upsert({
