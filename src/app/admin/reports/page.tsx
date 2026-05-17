@@ -18,8 +18,11 @@ export default function AdminReportsPage() {
 
   useEffect(() => {
     void (async () => {
-      const res = await fetch(`/api/reports/completion?period=${period}`);
-      if (res.ok) setCompletion(await res.json());
+      // In your page component, inside the useEffect
+const res = await fetch(`/api/reports/completion?period=${period}`);
+const data = await res.json();
+console.log("API response:", JSON.stringify(data, null, 2)); // add this
+if (res.ok) setCompletion(data);
     })();
   }, [period]);
 
