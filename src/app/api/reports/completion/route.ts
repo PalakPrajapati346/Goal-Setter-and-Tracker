@@ -18,15 +18,12 @@ const sheets = await prisma.goalSheet.findMany({
     ...(session.user.role === Role.MANAGER ? { managerId: session.user.id } : {}),
     //cycle: { year: 2026 }
   },
-  include: {
+ include: {
     employee: { select: { id: true, name: true, email: true } },
-    checkIns: { where: { period: period as any } },
+    checkIns: { where: { period: period as CycleKind } },
     goals: {
       include: {
-        // Fetch the quarterly updates to get the "actual" values
-        updates: {
-          where: { period: period as any }
-        }
+        updates: { where: { period: period as CycleKind } }
       }
     },
   },
