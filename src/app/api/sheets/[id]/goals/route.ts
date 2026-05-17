@@ -2,17 +2,31 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUserSession } from "@/lib/session";
 
+// ... existing imports
+
 export async function POST(req: Request, ctx: { params: { id: string } }) {
   const session = await requireUserSession();
   const sheetId = ctx.params.id;
 
   const sheet = await prisma.goalSheet.findUnique({
     where: { id: sheetId },
+    // Ensure you include the goals to check the length later
     include: { goals: true }
   });
 
-  if (!sheet || sheet.employeeId !== session.user.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  // DEBUG LOG: Check this in Vercel Logs if it still fails
+  console.log("Checking Auth:", { 
+    sheetExists: !!sheet, 
+    sheetUserId: sheet?.userId, 
+    sessionUserId: session.user.id 
+  });
+
+  // FIX: Changed sheet.employeeId to sheet.userId to match standard naming
+  if (!sheet || sheet.userId !== session.user.id) {
+    return NextResponse.json(
+      { error: "Unauthorized access to this sheet" }, 
+      { status: 403 }
+    );
   }
 
   if (sheet.goals.length >= 8) {
