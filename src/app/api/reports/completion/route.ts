@@ -14,8 +14,8 @@ export async function GET(req: Request) {
    // ... inside your GET function
 const sheets = await prisma.goalSheet.findMany({
   where: {
-    employee: { role: Role.EMPLOYEE },
-    ...(session.user.role === Role.MANAGER ? { managerId: session.user.id } : {}),
+   // employee: { role: Role.EMPLOYEE },
+    //...(session.user.role === Role.MANAGER ? { managerId: session.user.id } : {}),
     //cycle: { year: 2026 }
   },
  include: {
