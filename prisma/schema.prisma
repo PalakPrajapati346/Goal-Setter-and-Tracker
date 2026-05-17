@@ -1,0 +1,182 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  EMPLOYEE
+  MANAGER
+  ADMIN
+}
+
+enum GoalSheetStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REWORK
+}
+
+enum UomType {
+  NUMERIC
+  PERCENT
+  TIMELINE
+  ZERO_BASED
+}
+
+/// For NUMERIC/PERCENT: MIN = higher achievement is better; MAX = lower is better
+enum UomDirection {
+  MIN_HIGHER_BETTER
+  MAX_LOWER_BETTER
+}
+
+enum GoalProgressStatus {
+  NOT_STARTED
+  ON_TRACK
+  COMPLETED
+}
+
+enum CycleKind {
+  GOAL_SETTING
+  Q1
+  Q2
+  Q3
+  Q4
+}
+
+model User {
+  id             String      @id @default(cuid())
+  email          String      @unique
+  passwordHash   String
+  name           String
+  role           Role        @default(EMPLOYEE)
+  department     String?
+  managerId      String?
+  manager        User?       @relation("ReportsTo", fields: [managerId], references: [id])
+  directReports  User[]      @relation("ReportsTo")
+  goalSheets     GoalSheet[] @relation("EmployeeSheets")
+  managerSheets  GoalSheet[] @relation("ManagerSheets")
+  auditLogs      AuditLog[]
+  sharedCreated  SharedGoalDefinition[] @relation("SharedCreatedBy")
+  sharedPrimary  SharedGoalDefinition[] @relation("SharedPrimaryOwner")
+}
+
+model Cycle {
+  id        String    @id @default(cuid())
+  name      String
+  kind      CycleKind
+  year      Int
+  opensAt   DateTime
+  closesAt  DateTime
+  sheets    GoalSheet[]
+}
+
+model SharedGoalDefinition {
+  id             String   @id @default(cuid())
+  title          String
+  description    String?
+  thrustArea     String
+  uomType        UomType
+  direction      UomDirection
+  /// Target as string: number for numeric/%, ISO date end for timeline
+  target         String
+  deadline       DateTime?
+  createdById    String
+  createdBy      User     @relation("SharedCreatedBy", fields: [createdById], references: [id])
+  primaryOwnerId String
+  primaryOwner   User     @relation("SharedPrimaryOwner", fields: [primaryOwnerId], references: [id])
+  goals          Goal[]
+  createdAt      DateTime @default(now())
+}
+
+model GoalSheet {
+  id          String          @id @default(cuid())
+  employeeId  String
+  employee    User            @relation("EmployeeSheets", fields: [employeeId], references: [id])
+  managerId   String?
+  manager     User?           @relation("ManagerSheets", fields: [managerId], references: [id])
+  cycleId     String
+  cycle       Cycle           @relation(fields: [cycleId], references: [id])
+  status      GoalSheetStatus @default(DRAFT)
+  submittedAt DateTime?
+  approvedAt  DateTime?
+  lockedAt    DateTime?
+  goals       Goal[]
+  checkIns    CheckIn[]
+
+  @@unique([employeeId, cycleId])
+  @@index([managerId])
+  @@index([status])
+}
+
+model Goal {
+  id                  String   @id @default(cuid())
+  sheetId             String
+  sheet               GoalSheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+  sharedDefId         String?
+  sharedDef           SharedGoalDefinition? @relation(fields: [sharedDefId], references: [id])
+  title               String
+  description         String?
+  thrustArea          String
+  uomType             UomType
+  direction           UomDirection
+  target              String
+  deadline            DateTime?
+  weightPct           Decimal  @db.Decimal(5, 2)
+  readOnlyTitleTarget Boolean  @default(false)
+  isPrimaryOwner      Boolean  @default(true)
+  sortOrder           Int      @default(0)
+  updates             QuarterlyGoalUpdate[]
+  isArchived          Boolean  @default(false)
+  @@index([sheetId, thrustArea])
+  @@index([sheetId])
+  @@index([sharedDefId])
+}
+
+model QuarterlyGoalUpdate {
+  id            String             @id @default(cuid())
+  goalId        String
+  goal          Goal               @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  period        CycleKind
+  plannedTarget String?
+  actual        String?
+  status        GoalProgressStatus @default(NOT_STARTED)
+  /// 0-100 tracking score
+  progressScore Decimal?           @db.Decimal(7, 4)
+  employComment String?           @db.Text
+  updatedAt     DateTime           @default(now())
+  employeeNotes String?            @db.Text
+
+  @@unique([goalId, period])
+  @@index([period])
+}
+
+model CheckIn {
+  id          String   @id @default(cuid())
+  sheetId     String
+  sheet       GoalSheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+  period      CycleKind
+  managerId   String
+  comment     String   
+  managerRate Int?
+  completedAt DateTime @default(now())
+
+  @@unique([sheetId, period])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  entity     String
+  entityId   String
+  action     String
+  detail     String?
+  actorId    String
+  actor      User     @relation(fields: [actorId], references: [id])
+  createdAt  DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([createdAt])
+}
