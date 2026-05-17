@@ -63,51 +63,31 @@ const directions = ["MIN_HIGHER_BETTER", "MAX_LOWER_BETTER"] as const;
 
   const editable = sheet && (sheet.status === "DRAFT" || sheet.status === "REWORK");
 async function addGoal() {
-  setError(null);
   setMsg(null);
+  setError(null);
+
+  const newGoal = {
+    // Generate a temporary ID so React can track it in the list
+    id: `temp-${Date.now()}`, 
+    title: "New Goal",
+    thrustArea: "General",
+    uomType: "NUMERIC",
+    direction: "MIN_HIGHER_BETTER",
+    target: "0",
+    weightPct: 10,
+    readOnlyTitleTarget: false,
+    isPrimaryOwner: true,
+  };
+
+  setSheet((prev) => {
+    if (!prev) return prev;
+    return {
+      ...prev,
+      goals: [...prev.goals, newGoal],
+    };
+  });
   
-  let idToUse = sheet?.id;
-
-  try {
-    // 1. Handle Initialization
-    if (idToUse === "PENDING") {
-      setMsg("Creating your goal sheet in database...");
-      const createRes = await fetch("/api/sheets", { method: "POST" });
-      if (!createRes.ok) throw new Error(await createRes.text());
-      
-      const newSheet = await createRes.json();
-      idToUse = newSheet.id;
-      setSheet(newSheet); // Update local state
-    }
-
-    // 2. Add the Goal
-    setMsg("Adding goal...");
-    const res = await fetch(`/api/sheets/${idToUse}/goals`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: "New Goal",
-        thrustArea: "General",
-        uomType: "NUMERIC",
-        direction: "MIN_HIGHER_BETTER",
-        target: "0",
-        weightPct: 10,
-      }),
-    });
-
-    if (!res.ok) {
-  const errText = await res.text();
-  setMsg(null); // Clear the "Adding..." message
-  setError(`Server rejected goal: ${errText}`);
-  return;
-}
-
-    await load();
-    setMsg("Goal added successfully!");
-  } catch (err) {
-    setError(err instanceof Error ? err.message : "An unknown error occurred");
-    console.error("Add Goal Error:", err);
-  }
+  setMsg("Goal added to list (Not yet saved to database)");
 }
 
 async function patchGoal(id: string, patch: Record<string, unknown>) {
@@ -142,23 +122,27 @@ async function patchGoal(id: string, patch: Record<string, unknown>) {
     return;
   }
 
-  setMsg("Saving and submitting...");
-  
-  // We send the current local state of 'sheet.goals' to the server
-  const res = await fetch(`/api/sheets/${sheet.id}/submit`, { 
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ goals: sheet.goals }) // Send the updated goals here
-  });
+  setMsg("Saving all goals and submitting for approval...");
 
-  if (!res.ok) {
-    const data = await res.json();
-    setError(data.error || "Submission failed");
-    return;
+  try {
+    const res = await fetch(`/api/sheets/submit-all`, { 
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ 
+        goals: sheet.goals // Send the whole local list
+      }) 
+    });
+
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error || "Submission failed");
+    }
+
+    setMsg("Everything saved and submitted successfully!");
+    await load(); // Finally refresh from DB
+  } catch (err: any) {
+    setError(err.message);
   }
-
-  setMsg("Goals saved and submitted successfully!");
-  await load();
 }
   if (!sheet) {
     return <p className="p-8 text-sm text-slate-600">{error ?? "Loading…"}</p>;
@@ -227,12 +211,13 @@ async function patchGoal(id: string, patch: Record<string, unknown>) {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {sheet.goals.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="px-4 py-12 text-center text-slate-500">
-                  No goals added. Click + Add Goal to start.
-                </td>
-              </tr>
+  {/* 1. Safe Check: If goals is null, undefined, or empty, show the empty state */}
+  {(!sheet?.goals || sheet.goals.length === 0) ? (
+    <tr>
+      <td colSpan={7} className="px-4 py-12 text-center text-slate-500 italic">
+        No goals added yet. Click "+ Add Goal" to begin your plan.
+      </td>
+    </tr>
             ) : (
               sheet.goals.map((g) => (
                 <tr key={g.id} className="hover:bg-slate-50/50">
