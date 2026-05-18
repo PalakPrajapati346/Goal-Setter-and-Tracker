@@ -11,20 +11,25 @@ type Completion = {
     goals: { target: string; actual: string; weightPct: number }[]; 
   }[];
 };
-
+const [loading, setLoading] = useState(true);
 export default function AdminReportsPage() {
   const [completion, setCompletion] = useState<Completion | null>(null);
   const [period, setPeriod] = useState("Q1");
 
-  useEffect(() => {
-    void (async () => {
-      // In your page component, inside the useEffect
-const res = await fetch(`/api/reports/completion?period=${period}`);
-const data = await res.json();
-console.log("API response:", JSON.stringify(data, null, 2)); // add this
-if (res.ok) setCompletion(data);
-    })();
-  }, [period]);
+ useEffect(() => {
+  void (async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/reports/completion?period=${period}`);
+      const data = await res.json();
+      if (res.ok) setCompletion(data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  })();
+}, [period]);
 
   const stats = useMemo(() => {
     if (!completion || completion.rows.length === 0) return null;

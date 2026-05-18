@@ -30,7 +30,7 @@ export async function GET(req: Request) {
           // CRITICAL: We need the actual progress updates to calculate the score
           updates: { 
             where: { period: period as CycleKind },
-            orderBy: { createdAt: 'desc' },
+            //orderBy: { createdAt: 'desc' },
             take: 1 // Only take the most recent update for this period
           }
         }
