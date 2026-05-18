@@ -18,22 +18,26 @@ export default function ReportsClient({ userName }: { userName: string }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    void (async () => {
+    const fetchData = async () => {
       setLoading(true);
       try {
         const res = await fetch(`/api/reports/completion?period=${period}`);
-        const data = await res.json();
-        if (res.ok) setCompletion(data);
+        if (res.ok) {
+          const data = await res.json();
+          setCompletion(data);
+        }
       } catch (e) {
         console.error(e);
       } finally {
         setLoading(false);
       }
-    })();
+    };
+    fetchData();
   }, [period]);
 
   const stats = useMemo(() => {
     if (!completion || completion.rows.length === 0) return null;
+
     const total = completion.rows.length;
     const done = completion.rows.filter(r => r.employeeCheckInDone).length;
     const percentage = Math.round((done / total) * 100);
@@ -71,6 +75,8 @@ export default function ReportsClient({ userName }: { userName: string }) {
       topName: topEmployee.name 
     };
   }, [completion]);
+
+   
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-10 space-y-6">
