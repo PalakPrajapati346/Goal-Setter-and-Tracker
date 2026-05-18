@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
-
+export const dynamic = "force-dynamic";
 type Completion = {
   period: string;
   rows: { 
