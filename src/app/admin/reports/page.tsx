@@ -1,8 +1,12 @@
 "use client";
-
+export const dynamic = "force-dynamic";
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
-export const dynamic = "force-dynamic";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth-options";
+import { redirect } from "next/navigation";
+import { Role } from "@prisma/client";
+
 type Completion = {
   period: string;
   rows: { 
@@ -13,6 +17,13 @@ type Completion = {
 };
 const [loading, setLoading] = useState(true);
 export default function AdminReportsPage() {
+  const session = await getServerSession(authOptions);
+
+  // If the build tries to run this, it will see this redirect and stop, 
+  // which is what we want.
+  if (!session || session.user.role !== Role.ADMIN) {
+    redirect("/login");
+  }
   const [completion, setCompletion] = useState<Completion | null>(null);
   const [period, setPeriod] = useState("Q1");
 
