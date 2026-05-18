@@ -30,7 +30,8 @@ export async function GET(req: Request) {
       },
       updates: period
         ? { where: { period } }
-        : { orderBy: { updatedAt: "desc" }, take: 1 },
+        : { //orderBy: { updatedAt: "desc" }, 
+        take: 1 },
     },
     orderBy: [{ sheetId: "asc" }, { sortOrder: "asc" }],
   });
