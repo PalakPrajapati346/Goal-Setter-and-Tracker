@@ -212,24 +212,27 @@ export default function AdminReportsPage() {
           </select>
         </div>
 
-        {!completion ? (
-          <div className="animate-pulse space-y-3 p-4">
-            <div className="h-4 bg-slate-100 rounded w-3/4"></div>
-            <div className="h-4 bg-slate-100 rounded w-1/2"></div>
-          </div>
-        ) : (
-          <div className="divide-y divide-slate-100 overflow-hidden rounded-lg border border-slate-100">
-            {completion.rows.map((r, idx) => (
-              <div key={idx} className="flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition">
-                <span className="font-medium text-slate-700">{r.employee.name}</span>
-                <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${r.employeeCheckInDone ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
-                  <span className={`h-1.5 w-1.5 rounded-full ${r.employeeCheckInDone ? "bg-emerald-500" : "bg-amber-500"}`}></span>
-                  {r.employeeCheckInDone ? "Review Done" : "Awaiting Manager"}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
+        {loading ? (
+  <div className="animate-pulse space-y-3 p-4">
+    <div className="h-4 bg-slate-100 rounded w-3/4"></div>
+    <div className="h-4 bg-slate-100 rounded w-1/2"></div>
+    <div className="h-4 bg-slate-100 rounded w-2/3"></div>
+  </div>
+) : completion?.rows.length === 0 ? (
+  <p className="text-sm text-slate-400 px-4 py-6 text-center">No data for {period} yet.</p>
+) : (
+  <div className="divide-y divide-slate-100 overflow-hidden rounded-lg border border-slate-100">
+    {completion?.rows.map((r, idx) => (
+      <div key={idx} className="flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition">
+        <span className="font-medium text-slate-700">{r.employee.name}</span>
+        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${r.employeeCheckInDone ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
+          <span className={`h-1.5 w-1.5 rounded-full ${r.employeeCheckInDone ? "bg-emerald-500" : "bg-amber-500"}`}></span>
+          {r.employeeCheckInDone ? "Review Done" : "Awaiting Manager"}
+        </span>
+      </div>
+    ))}
+  </div>
+)}
       </div>
     </main>
   );
